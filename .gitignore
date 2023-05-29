@@ -1,0 +1,5 @@
+*
+!.gitignore 
+!*.py 
+creds.py
+README.md
