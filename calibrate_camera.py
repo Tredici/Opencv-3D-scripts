@@ -49,8 +49,7 @@ def parse():
             exit(1)
     else:
         args.chessboard = (ROWS, COLS)
-    picdirname = f"CALIBRATION-{args.picdir}-{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
-    picdirname = os.path.join(basedir, picdirname)
+    picdirname = os.path.join(os.path.dirname(args.picdir), f"CALIBRATION-{os.path.basename(args.picdir)}-{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}")
     if os.path.exists(picdirname):
         print_err(f"Invalid path '{picdirname}'")
 
