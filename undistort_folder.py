@@ -11,10 +11,10 @@ import re
 # directory containing picture to locate picture to perform undistortion
 chessdir = os.path.join(os.path.dirname(__file__), 'pics-2023-05-29_16-44-19-CALIBBOARD-OK')
 
-def calculate_undistortion_params(chessdir):
-    # chessboard size
-    ROWS = 6
-    COLS = 9
+def calculate_undistortion_params(chessdir, ROWS = 6, COLS = 9):
+    ## chessboard size
+    #ROWS = 6
+    #COLS = 9
     # termination criteria
     criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
     # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
@@ -36,8 +36,55 @@ def calculate_undistortion_params(chessdir):
             objpoints.append(objp)
             corners2 = cv.cornerSubPix(gray,corners, (11,11), (-1,-1), criteria)
             imgpoints.append(corners2)
+    # Doc:
+    #  https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html#ga3207604e4b1a1758aa66acb6ed5aa65d
     ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
     return (ret, mtx, dist, rvecs, tvecs)
+
+def store_or_show_undistorted_images(pic_dir, calibration_mtx, calibration_dist, outdir=None, waitKeyTimeout=0, assert_img_width=None, assert_img_height=None):
+    mtx = calibration_mtx
+    dist = calibration_dist
+    path_to_search = os.path.join(pic_dir, "*.jpg")
+    images = glob.glob(path_to_search)
+    img_cnt = len(images)
+    img_idx = 0
+    for p in images:
+        img_idx += 1
+        img = cv2.imread(p)
+        img_name = os.path.basename(p)
+
+        # load and undistort img
+        h, w = img.shape[:2]
+        newcameramtx, roi = cv.getOptimalNewCameraMatrix(mtx, dist, (w,h), 1, (w,h))
+        # undistort
+        dst = cv.undistort(img, mtx, dist, None, newcameramtx)
+        # crop the image
+        x, y, w, h = roi
+        dst = dst[y:y+h, x:x+w]
+
+        # show old and undistorted image
+        img_und = np.zeros(img.shape, np.uint8)
+        img_und[y:y+h, x:x+w] = dst
+        comparison = np.concatenate((img, img_und), axis=0)
+        comparison = cv.resize(comparison, tuple(map(lambda n:n//2, comparison.shape[0:2])))
+
+        if waitKeyTimeout is not None:
+            winname = f"[{img_idx}/{img_cnt}] Undistorted {img_name}"
+            cv2.imshow(winname, comparison)
+            cv.waitKey(waitKeyTimeout)
+            cv2.destroyWindow(winname)
+
+        if outdir:
+            # store undistorted image
+            outpath = os.path.join(outdir, img_name)
+            cv2.imwrite(outpath, dst)
+            print("Saved", outpath)
+            print()
+
+
+def show_undistorted_images(pic_dir, mtx, dist, waitKeyTimeout=0, assert_img_width=None, assert_img_height=None):
+    store_or_show_undistorted_images(pic_dir, mtx, dist, outdir=None, waitKeyTimeout=waitKeyTimeout, assert_img_width=assert_img_width, assert_img_height=assert_img_height)
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("indir", help="Path to directory containing pics to be filtered")
@@ -79,6 +126,7 @@ def main():
     # calculate reconstruction parameters
     ret, mtx, dist, rvecs, tvecs = calculate_undistortion_params(chessdir)
 
+    # show undistorted images
     img_idx = 0
     for p in jpg_paths:
         img_idx += 1
